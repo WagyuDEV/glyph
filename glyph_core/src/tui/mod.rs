@@ -27,7 +27,6 @@ pub trait Scrollable: Renderable {
             }
             // Should scroll up
             (_, y) if (y + 1).saturating_sub(scroll.row) == 0 => {
-                tracing::error!("mths {} {}", (y + 1).saturating_sub(scroll.row), y);
                 scroll.row = scroll.row - (scroll.row - y);
             }
             // Should scroll right

@@ -38,7 +38,6 @@ impl Tab {
 mod tests {
     use super::*;
     use crate::buffer::*;
-    use std::sync::{Arc, Mutex};
 
     use crate::config::{Config, EditorBackground, Keys, LineNumbers};
     use crate::theme::Theme;

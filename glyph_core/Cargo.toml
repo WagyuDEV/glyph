@@ -1,0 +1,22 @@
+[package]
+name = "glyph_core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+tracing-appender.workspace = true
+tokio.workspace = true
+crossterm.workspace = true
+
+tree-sitter = "0.20.10"
+tree-sitter-rust = "0.20.4"
+serde = { version = "1.0.196", features = ["derive"] }
+toml = "0.8.10"
+dirs = "5.0.1"
+serde_json = "1.0.113"
+futures-timer = "3.0.2"
+futures = "0.3.30"
+futures-util = "0.3.30"

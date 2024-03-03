@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::buffer::Buffer;
 use crate::config::{Action, Config, KeyAction};
-use crate::events::EventHandler;
+use crate::event_handler::EventHandler;
 use crate::lsp::{IncomingMessage, LspClient};
 use crate::tab::Tab;
 use crate::theme::Theme;
@@ -64,8 +64,8 @@ where
     lsp: LspClient,
     stdout: Stdout,
     size: Size,
-    //    statusline: S,
-    //    commandline: C,
+    // statusline: S,
+    // commandline: C,
     mode: Mode,
     tabs: HashMap<usize, Tab>,
     windows: HashMap<usize, Window<'a>>,
@@ -75,7 +75,7 @@ where
     active_buffer: usize,
 }
 
-impl<'a /*S, C*/, E> Editor<'a /*S, C*/, E>
+impl<'a /*S C*/, E> Editor<'a /*S C*/, E>
 where
     // S: Statusline,
     // C: Commandline,

@@ -1,23 +1,19 @@
 use std::collections::HashMap;
 
+use glyph_core::event_handler::EventHandler;
+use glyph_core::Mode;
+use glyph_core::{Action, Config, KeyAction};
+
 use crossterm::event::Event;
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent};
-
-use crate::config::{Action, Config, KeyAction};
-use crate::editor::Mode;
-
-pub trait EventHandler {
-    // TODO: once we start looking into GUI, this would have to be our own event
-    fn poll(&mut self, event: &Event, mode: &Mode) -> Option<KeyAction>;
-}
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 #[derive(Debug)]
-pub struct Events<'a> {
+pub struct TuiEventHandler<'a> {
     action_being_composed: Option<String>,
     config: &'a Config,
 }
 
-impl EventHandler for Events<'_> {
+impl EventHandler for TuiEventHandler<'_> {
     fn poll(&mut self, event: &Event, mode: &Mode) -> Option<KeyAction> {
         if let Some(action) = self.action_being_composed.take() {
             self.action_being_composed = Some(action);
@@ -63,9 +59,9 @@ impl EventHandler for Events<'_> {
     }
 }
 
-impl<'a> Events<'a> {
+impl<'a> TuiEventHandler<'a> {
     pub fn new(config: &'a Config) -> Self {
-        Events {
+        Self {
             action_being_composed: None,
             config,
         }

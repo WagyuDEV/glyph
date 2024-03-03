@@ -2,7 +2,7 @@ mod buffer;
 mod config;
 mod cursor;
 mod editor;
-mod events;
+pub mod event_handler;
 mod highlight;
 mod lsp;
 mod tab;
@@ -11,21 +11,20 @@ mod tui;
 mod viewport;
 mod window;
 
+pub use config::{Action, Config, KeyAction};
+pub use editor::Editor;
+pub use editor::Mode;
+pub use lsp::LspClient;
+
 use std::{
     io::{Error, ErrorKind},
     path::{Path, PathBuf},
 };
 
-use config::{Config, EditorBackground};
-use events::Events;
-use tracing::Level;
-use tracing_subscriber::FmtSubscriber;
-
-use editor::Editor;
-use lsp::LspClient;
+use config::EditorBackground;
 use theme::{loader::ThemeLoader, Theme};
 
-fn load_config() -> anyhow::Result<Config> {
+pub fn load_config() -> anyhow::Result<Config> {
     let config_dir = Config::get_path();
     let config_file = config_dir.join("glyph.toml");
     let config_file = Path::new(&config_file);
@@ -43,7 +42,7 @@ fn load_config() -> anyhow::Result<Config> {
     Ok(config)
 }
 
-fn load_theme(
+pub fn load_theme(
     background: &EditorBackground,
     theme_name: &str,
     themes_dir: PathBuf,
@@ -68,24 +67,4 @@ fn load_theme(
             Ok(theme.into())
         }
     }
-}
-
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    let appender = tracing_appender::rolling::never(".", "glyph.log");
-    let (writer, _guard) = tracing_appender::non_blocking(appender);
-    let subscriber = FmtSubscriber::builder()
-        .with_max_level(Level::TRACE)
-        .with_writer(writer)
-        .finish();
-
-    tracing::subscriber::set_global_default(subscriber).expect("Setting default subscriber failed");
-
-    let file_name = std::env::args().nth(1);
-    let lsp = LspClient::start().await?;
-    let config = load_config()?;
-    let theme = load_theme(&config.background, &config.theme, Config::themes_path())?;
-    let event_handler = Events::new(&config);
-    Editor::new(&config, &theme, lsp, file_name, event_handler).await?;
-    Ok(())
 }
