@@ -10,12 +10,12 @@ impl Default for Cell {
     fn default() -> Self {
         Self {
             c: ' ',
-            style: Style::default(),
+            style: Default::default(),
         }
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Viewport {
     pub cells: Vec<Cell>,
     pub width: usize,

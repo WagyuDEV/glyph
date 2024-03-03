@@ -24,12 +24,23 @@ pub struct Position {
     pub col: usize,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct Rect {
     pub row: usize,
     pub col: usize,
     pub height: usize,
     pub width: usize,
+}
+
+impl Rect {
+    pub fn new(col: usize, row: usize, width: usize, height: usize) -> Self {
+        Self {
+            col,
+            row,
+            width,
+            height,
+        }
+    }
 }
 
 impl From<Size> for Rect {
@@ -96,6 +107,7 @@ impl<'a> Window<'a> {
     }
 
     pub fn initialize(&mut self, mode: &Mode) -> anyhow::Result<()> {
+        tracing::debug!("{:?}", self.layers[0]);
         self.render(mode)?;
         Ok(())
     }
@@ -149,7 +161,11 @@ impl<'a> Window<'a> {
     fn render_buffer(&mut self) -> anyhow::Result<()> {
         let last_buffer_layer = self.layers[0].clone();
         let mut viewport = Viewport::new(self.size.width, self.size.height);
-
+        tracing::debug!(
+            "{}, {}",
+            viewport.cells.len(),
+            self.size.width * self.size.height
+        );
         self.buffer_view.maybe_scroll(&self.cursor);
         self.draw_sidebar(&mut viewport);
         let cells = self.get_highlight();

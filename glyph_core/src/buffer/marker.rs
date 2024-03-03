@@ -20,6 +20,7 @@ pub trait Marker: std::fmt::Debug {
     fn get_by_line(&self, line: usize) -> Option<Mark>;
     fn set_marks(&mut self, text: &[char]);
     fn len(&self) -> usize;
+    fn is_empty(&self) -> bool;
 }
 
 impl dyn Marker {

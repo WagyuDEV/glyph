@@ -27,6 +27,10 @@ impl Marker for VecMarker {
         self.marks.len()
     }
 
+    fn is_empty(&self) -> bool {
+        self.marks.is_empty()
+    }
+
     fn add_mark(&mut self, mark: Mark, at: usize) {
         self.marks.insert(at, mark);
         self.update_marks();

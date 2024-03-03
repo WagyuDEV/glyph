@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use glyph_core::buffer::Buffer;
 use glyph_core::config::{Action, Config, KeyAction};
-use glyph_core::editor::{Commandline, Mode, Size, Statusline};
+use glyph_core::editor::{Commandline, Mode, Size, Statusline, StatuslineUpdate};
 use glyph_core::event_handler::EventHandler;
 use glyph_core::lsp::{IncomingMessage, LspClient};
 use glyph_core::tab::Tab;
@@ -20,7 +20,7 @@ use futures::{future::FutureExt, StreamExt};
 
 pub struct TuiEditor<'a, S, C, E>
 where
-    S: Statusline,
+    S: Statusline<'a>,
     C: Commandline,
     E: EventHandler,
 {
@@ -39,27 +39,32 @@ where
     active_buffer: usize,
 }
 
+pub struct EditorSetup<'a> {
+    pub size: Size,
+    pub config: &'a Config,
+    pub theme: &'a Theme,
+    pub lsp: LspClient,
+    pub file_name: Option<String>,
+}
+
 impl<'a, S, C, E> TuiEditor<'a, S, C, E>
 where
-    S: Statusline,
+    S: Statusline<'a>,
     C: Commandline,
     E: EventHandler,
 {
-    pub async fn new(
-        config: &'a Config,
-        theme: &'a Theme,
-        lsp: LspClient,
-        file_name: Option<String>,
+    pub fn new(
+        setup: EditorSetup<'a>,
         statusline: S,
         commandline: C,
         event_handler: E,
     ) -> anyhow::Result<Self> {
         let mut editor = Self {
             event_handler,
-            lsp,
+            lsp: setup.lsp,
             mode: Mode::Normal,
             stdout: stdout(),
-            size: terminal::size()?.into(),
+            size: setup.size,
             statusline,
             commandline,
             tabs: HashMap::new(),
@@ -71,10 +76,16 @@ where
         };
 
         let buffer_id = 1;
-        let buffer = Rc::new(RefCell::new(Buffer::new(buffer_id, file_name)?));
+        let buffer = Rc::new(RefCell::new(Buffer::new(buffer_id, setup.file_name)?));
         let mut window_size: Rect = editor.size.into();
         window_size.height -= 2;
-        let window = Window::new(1, Some(buffer.clone()), theme, config, window_size);
+        let window = Window::new(
+            1,
+            Some(buffer.clone()),
+            setup.theme,
+            setup.config,
+            window_size,
+        );
         let tab = Tab::new(1);
         editor.tabs.insert(tab.id, tab);
         editor.windows.insert(window.id, window);
@@ -94,11 +105,23 @@ where
             .get_mut(&self.active_window)
             .unwrap()
             .initialize(&self.mode)?;
+        let buffer = self.buffers.get(&self.active_buffer).unwrap();
+        let cursor_pos = self
+            .windows
+            .get(&self.active_window)
+            .unwrap()
+            .get_cursor_readable_position();
+        self.statusline.render(StatuslineUpdate::new(
+            self.mode.clone(),
+            cursor_pos,
+            buffer.clone(),
+        ))?;
+        self.commandline.render()?;
         self.stdout.flush()?;
         Ok(())
     }
 
-    async fn start(&mut self) -> anyhow::Result<()> {
+    pub async fn start(&mut self) -> anyhow::Result<()> {
         self.initialize()?;
         self.lsp.initialize().await?;
 
@@ -190,7 +213,20 @@ where
                 _ => (),
             };
         }
-        self.stdout.flush()?;
+        self.stdout
+            .queue(cursor::SavePosition)?
+            .queue(cursor::Hide)?;
+        let cursor_pos = window.get_cursor_readable_position();
+        let buffer = self.buffers.get(&self.active_buffer).unwrap();
+        self.statusline.render(StatuslineUpdate::new(
+            self.mode.clone(),
+            cursor_pos.clone(),
+            buffer.clone(),
+        ))?;
+        self.stdout
+            .queue(cursor::RestorePosition)?
+            .queue(cursor::Show)?
+            .flush()?;
         Ok(())
     }
 

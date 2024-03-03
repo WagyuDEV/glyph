@@ -36,6 +36,10 @@ impl Renderable for TuiView {
     ) -> anyhow::Result<()> {
         let changes = view.diff(last_view);
 
+        if changes.len() > 30 {
+            tracing::debug!("{:?}", changes[30]);
+        }
+
         for change in changes {
             let col = self.area.col + change.col;
             let row = self.area.row + change.row;

@@ -1,12 +1,18 @@
+mod commandline;
 mod editor;
 mod event_handler;
+mod statusline;
 
+use commandline::TuiCommandline;
 use glyph_core::config::Config;
+use glyph_core::editor::{Commandline, Size, Statusline};
 use glyph_core::lsp::LspClient;
 
-use editor::TuiEditor;
+use editor::{EditorSetup, TuiEditor};
 use event_handler::TuiEventHandler;
 
+use glyph_core::window::Rect;
+use statusline::TuiStatusline;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
@@ -26,6 +32,18 @@ async fn main() -> anyhow::Result<()> {
     let config = glyph_core::load_config()?;
     let theme = glyph_core::load_theme(&config.background, &config.theme, Config::themes_path())?;
     let event_handler = TuiEventHandler::new(&config);
-    TuiEditor::new(&config, &theme, lsp, file_name, event_handler).await?;
+    let size: Size = crossterm::terminal::size()?.into();
+    let statusline = TuiStatusline::new(Rect::new(0, size.height - 2, size.width, 1), &theme);
+    let commandline = TuiCommandline::new(Rect::new(0, size.height - 1, size.width, 1));
+    let editor_setup = EditorSetup {
+        config: &config,
+        theme: &theme,
+        lsp,
+        file_name,
+        size,
+    };
+    let mut editor = TuiEditor::new(editor_setup, statusline, commandline, event_handler)?;
+    editor.start().await?;
+
     Ok(())
 }
