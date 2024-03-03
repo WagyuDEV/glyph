@@ -2,6 +2,7 @@ mod commandline;
 mod diff;
 mod editor;
 mod event_handler;
+// mod popup;
 mod statusline;
 mod view;
 
