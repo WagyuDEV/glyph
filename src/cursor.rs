@@ -1,8 +1,8 @@
 use crate::buffer::Buffer;
-use crate::config::{Action, KeyAction};
+use crate::config::Action;
 use crate::editor::Mode;
 
-use crate::pane::Position;
+use crate::window::Position;
 
 #[derive(Debug)]
 pub struct Cursor {
@@ -20,22 +20,27 @@ impl Cursor {
         }
     }
 
-    pub fn handle(&mut self, action: &KeyAction, buffer: &mut Buffer, mode: &Mode) {
+    pub fn handle_action(&mut self, action: &Action, buffer: &mut Buffer, mode: &Mode) {
+        tracing::debug!(
+            "cursor: {}:{} handling action: {action:?}",
+            self.row,
+            self.col
+        );
         match action {
-            KeyAction::Simple(Action::MoveToTop) => self.move_to_top(),
-            KeyAction::Simple(Action::MoveToBottom) => self.move_to_bottom(buffer),
-            KeyAction::Simple(Action::MoveUp) => self.move_up(buffer),
-            KeyAction::Simple(Action::MoveRight) => self.move_right(buffer, mode),
-            KeyAction::Simple(Action::MoveDown) => self.move_down(buffer, mode),
-            KeyAction::Simple(Action::MoveLeft) => self.move_left(buffer),
-            KeyAction::Simple(Action::MoveToLineStart) => self.move_to_line_start(buffer),
-            KeyAction::Simple(Action::MoveToLineEnd) => self.move_to_line_end(buffer),
-            KeyAction::Simple(Action::NextWord) => self.move_to_next_word(buffer),
-            KeyAction::Simple(Action::InsertChar(_)) => self.insert_char(),
-            KeyAction::Simple(Action::DeletePreviousChar) => self.delete_prev_char(buffer),
-            KeyAction::Simple(Action::InsertLineBelow) => self.insert_line_below(buffer),
-            KeyAction::Simple(Action::InsertLineAbove) => self.insert_line_above(buffer),
-            KeyAction::Simple(Action::InsertLine) => self.insert_line(),
+            Action::MoveToTop => self.move_to_top(),
+            Action::MoveToBottom => self.move_to_bottom(buffer),
+            Action::MoveUp => self.move_up(buffer),
+            Action::MoveRight => self.move_right(buffer, mode),
+            Action::MoveDown => self.move_down(buffer, mode),
+            Action::MoveLeft => self.move_left(buffer),
+            Action::MoveToLineStart => self.move_to_line_start(buffer),
+            Action::MoveToLineEnd => self.move_to_line_end(buffer),
+            Action::NextWord => self.move_to_next_word(buffer),
+            Action::InsertChar(_) => self.insert_char(),
+            Action::DeletePreviousChar => self.delete_prev_char(buffer),
+            Action::InsertLineBelow => self.insert_line_below(buffer),
+            Action::InsertLineAbove => self.insert_line_above(buffer),
+            Action::InsertLine => self.insert_line(),
             _ => (),
         }
     }
@@ -253,11 +258,7 @@ mod tests {
         let mut buffer = Buffer::from_string(1, "Hello\nWorld\nEveryone", gap);
         cursor.row = 1;
 
-        cursor.handle(
-            &KeyAction::Simple(Action::MoveUp),
-            &mut buffer,
-            &Mode::Normal,
-        );
+        cursor.handle_action(&Action::MoveUp, &mut buffer, &Mode::Normal);
 
         assert_eq!(cursor.col, 0);
         assert_eq!(cursor.absolute_position, 0);
@@ -283,18 +284,10 @@ mod tests {
             Buffer::from_string(1, "Hello World! This is a big line\n this isn't\n", gap);
 
         for _ in 0..20 {
-            cursor.handle(
-                &KeyAction::Simple(Action::MoveRight),
-                &mut buffer,
-                &Mode::Normal,
-            );
+            cursor.handle_action(&Action::MoveRight, &mut buffer, &Mode::Normal);
         }
 
-        cursor.handle(
-            &KeyAction::Simple(Action::MoveToLineStart),
-            &mut buffer,
-            &Mode::Normal,
-        );
+        cursor.handle_action(&Action::MoveToLineStart, &mut buffer, &Mode::Normal);
 
         assert_eq!(cursor.col, 0);
         assert_eq!(cursor.absolute_position, 0);
@@ -307,11 +300,7 @@ mod tests {
         let mut buffer =
             Buffer::from_string(1, "Hello World! This is a big line\n this isn't\n", gap);
 
-        cursor.handle(
-            &KeyAction::Simple(Action::MoveToLineEnd),
-            &mut buffer,
-            &Mode::Normal,
-        );
+        cursor.handle_action(&Action::MoveToLineEnd, &mut buffer, &Mode::Normal);
 
         assert_eq!(cursor.col, 30);
         assert_eq!(cursor.absolute_position, 30);
@@ -324,11 +313,7 @@ mod tests {
         let mut buffer = Buffer::from_string(1, "Hello\nWorld\nEveryone", gap);
         cursor.row = 0;
 
-        cursor.handle(
-            &KeyAction::Simple(Action::MoveDown),
-            &mut buffer,
-            &Mode::Normal,
-        );
+        cursor.handle_action(&Action::MoveDown, &mut buffer, &Mode::Normal);
 
         assert_eq!(cursor.col, 0);
         assert_eq!(cursor.absolute_position, 6);
@@ -341,11 +326,7 @@ mod tests {
         let mut cursor = Cursor::new();
         let mut buffer = Buffer::from_string(1, "Hello\nWorld\nEveryone", gap);
 
-        cursor.handle(
-            &KeyAction::Simple(Action::MoveRight),
-            &mut buffer,
-            &Mode::Normal,
-        );
+        cursor.handle_action(&Action::MoveRight, &mut buffer, &Mode::Normal);
 
         assert_eq!(cursor.col, 1);
         assert_eq!(cursor.absolute_position, 1);
@@ -360,11 +341,7 @@ mod tests {
         cursor.col = 1;
         cursor.absolute_position = 1;
 
-        cursor.handle(
-            &KeyAction::Simple(Action::MoveLeft),
-            &mut buffer,
-            &Mode::Normal,
-        );
+        cursor.handle_action(&Action::MoveLeft, &mut buffer, &Mode::Normal);
 
         assert_eq!(cursor.col, 0);
         assert_eq!(cursor.absolute_position, 0);
@@ -379,20 +356,12 @@ mod tests {
             Buffer::from_string(1, "Hello World! This is a big line\n this isn't\n", gap);
 
         for _ in 0..20 {
-            cursor.handle(
-                &KeyAction::Simple(Action::MoveRight),
-                &mut buffer,
-                &Mode::Normal,
-            );
+            cursor.handle_action(&Action::MoveRight, &mut buffer, &Mode::Normal);
         }
 
         assert_eq!(cursor.col, 20);
         assert_eq!(cursor.absolute_position, 20);
-        cursor.handle(
-            &KeyAction::Simple(Action::MoveDown),
-            &mut buffer,
-            &Mode::Normal,
-        );
+        cursor.handle_action(&Action::MoveDown, &mut buffer, &Mode::Normal);
 
         let mark = buffer
             .marker
@@ -410,22 +379,14 @@ mod tests {
         let mut cursor = Cursor::new();
         let mut buffer =
             Buffer::from_string(1, "Hello\nWorld! This is a big line we got here", gap);
-        cursor.handle(
-            &KeyAction::Simple(Action::MoveDown),
-            &mut buffer,
-            &Mode::Normal,
-        );
+        cursor.handle_action(&Action::MoveDown, &mut buffer, &Mode::Normal);
         cursor.col = 20;
         cursor.absolute_position += 20;
 
         assert_eq!(cursor.col, 20);
         assert_eq!(cursor.absolute_position, 26);
 
-        cursor.handle(
-            &KeyAction::Simple(Action::MoveUp),
-            &mut buffer,
-            &Mode::Normal,
-        );
+        cursor.handle_action(&Action::MoveUp, &mut buffer, &Mode::Normal);
 
         let mark = buffer
             .marker
@@ -442,22 +403,14 @@ mod tests {
         let gap = 5;
         let mut cursor = Cursor::new();
         let mut buffer = Buffer::from_string(1, "Hello World! This is a big line\nThis isn't", gap);
-        cursor.handle(
-            &KeyAction::Simple(Action::MoveDown),
-            &mut buffer,
-            &Mode::Normal,
-        );
+        cursor.handle_action(&Action::MoveDown, &mut buffer, &Mode::Normal);
         cursor.col = 5;
         cursor.absolute_position += 5;
 
         assert_eq!(cursor.col, 5);
         assert_eq!(cursor.absolute_position, 37);
 
-        cursor.handle(
-            &KeyAction::Simple(Action::MoveUp),
-            &mut buffer,
-            &Mode::Normal,
-        );
+        cursor.handle_action(&Action::MoveUp, &mut buffer, &Mode::Normal);
 
         let mark = buffer
             .marker
@@ -479,11 +432,7 @@ mod tests {
         cursor.col = 5;
         cursor.absolute_position = 5;
 
-        cursor.handle(
-            &KeyAction::Simple(Action::MoveDown),
-            &mut buffer,
-            &Mode::Normal,
-        );
+        cursor.handle_action(&Action::MoveDown, &mut buffer, &Mode::Normal);
 
         let mark = buffer
             .marker
@@ -502,11 +451,7 @@ mod tests {
         let mut cursor = Cursor::new();
         let mut buffer = Buffer::from_string(1, "Hello\nWorld!", gap);
 
-        cursor.handle(
-            &KeyAction::Simple(Action::MoveLeft),
-            &mut buffer,
-            &Mode::Normal,
-        );
+        cursor.handle_action(&Action::MoveLeft, &mut buffer, &Mode::Normal);
 
         assert_eq!(cursor.col, 0);
         assert_eq!(cursor.absolute_position, 0);
@@ -521,11 +466,7 @@ mod tests {
         cursor.absolute_position = 5;
         cursor.col = 5;
 
-        cursor.handle(
-            &KeyAction::Simple(Action::MoveUp),
-            &mut buffer,
-            &Mode::Normal,
-        );
+        cursor.handle_action(&Action::MoveUp, &mut buffer, &Mode::Normal);
 
         assert_eq!(cursor.col, 0);
         assert_eq!(cursor.absolute_position, 0);
@@ -538,11 +479,7 @@ mod tests {
         let mut cursor = Cursor::new();
         let mut buffer = Buffer::from_string(1, "Hello World!", gap);
 
-        cursor.handle(
-            &KeyAction::Simple(Action::MoveDown),
-            &mut buffer,
-            &Mode::Normal,
-        );
+        cursor.handle_action(&Action::MoveDown, &mut buffer, &Mode::Normal);
 
         assert_eq!(cursor.col, 10);
         assert_eq!(cursor.absolute_position, 10);
@@ -557,11 +494,7 @@ mod tests {
         cursor.absolute_position = 11;
         cursor.col = 11;
 
-        cursor.handle(
-            &KeyAction::Simple(Action::MoveRight),
-            &mut buffer,
-            &Mode::Normal,
-        );
+        cursor.handle_action(&Action::MoveRight, &mut buffer, &Mode::Normal);
 
         assert_eq!(cursor.col, 10);
         assert_eq!(cursor.absolute_position, 10);
@@ -575,22 +508,14 @@ mod tests {
         let mut buffer = Buffer::from_string(1, "Random\nmultiline\nstring\ntext\nbuffer", gap);
 
         for _ in 0..5 {
-            cursor.handle(
-                &KeyAction::Simple(Action::MoveDown),
-                &mut buffer,
-                &Mode::Normal,
-            );
+            cursor.handle_action(&Action::MoveDown, &mut buffer, &Mode::Normal);
         }
 
         assert_eq!(cursor.row, 4);
         assert_eq!(cursor.col, 4);
         assert_eq!(cursor.absolute_position, 33);
 
-        cursor.handle(
-            &KeyAction::Simple(Action::MoveToTop),
-            &mut buffer,
-            &Mode::Normal,
-        );
+        cursor.handle_action(&Action::MoveToTop, &mut buffer, &Mode::Normal);
 
         assert_eq!(cursor.row, 0);
         assert_eq!(cursor.col, 0);
@@ -603,11 +528,7 @@ mod tests {
         let mut cursor = Cursor::new();
         let mut buffer = Buffer::from_string(1, "Random\nmultiline\nstring\ntext\nbuffer", gap);
 
-        cursor.handle(
-            &KeyAction::Simple(Action::MoveToBottom),
-            &mut buffer,
-            &Mode::Normal,
-        );
+        cursor.handle_action(&Action::MoveToBottom, &mut buffer, &Mode::Normal);
 
         assert_eq!(cursor.row, 4);
         assert_eq!(cursor.col, 4);
@@ -620,11 +541,7 @@ mod tests {
         let mut cursor = Cursor::new();
         let mut buffer = Buffer::from_string(1, "Hello, World!", gap);
 
-        cursor.handle(
-            &KeyAction::Simple(Action::InsertChar('.')),
-            &mut buffer,
-            &Mode::Normal,
-        );
+        cursor.handle_action(&Action::InsertChar('.'), &mut buffer, &Mode::Normal);
 
         assert_eq!(cursor.row, 0);
         assert_eq!(cursor.col, 1);
@@ -639,11 +556,7 @@ mod tests {
         cursor.col = 3;
         cursor.absolute_position = 3;
 
-        cursor.handle(
-            &KeyAction::Simple(Action::DeletePreviousChar),
-            &mut buffer,
-            &Mode::Normal,
-        );
+        cursor.handle_action(&Action::DeletePreviousChar, &mut buffer, &Mode::Normal);
 
         assert_eq!(cursor.col, 2);
         assert_eq!(cursor.absolute_position, 2);
@@ -657,11 +570,7 @@ mod tests {
         cursor.col = 3;
         cursor.absolute_position = 3;
 
-        cursor.handle(
-            &KeyAction::Simple(Action::InsertLineBelow),
-            &mut buffer,
-            &Mode::Normal,
-        );
+        cursor.handle_action(&Action::InsertLineBelow, &mut buffer, &Mode::Normal);
 
         assert_eq!(cursor.col, 0);
         assert_eq!(cursor.absolute_position, 6);
@@ -677,11 +586,7 @@ mod tests {
         cursor.row = 1;
         cursor.absolute_position = 9;
 
-        cursor.handle(
-            &KeyAction::Simple(Action::InsertLineAbove),
-            &mut buffer,
-            &Mode::Normal,
-        );
+        cursor.handle_action(&Action::InsertLineAbove, &mut buffer, &Mode::Normal);
 
         assert_eq!(cursor.col, 0);
         assert_eq!(cursor.absolute_position, 6);
@@ -697,11 +602,7 @@ mod tests {
         cursor.row = 0;
         cursor.absolute_position = 6;
 
-        cursor.handle(
-            &KeyAction::Simple(Action::InsertLine),
-            &mut buffer,
-            &Mode::Normal,
-        );
+        cursor.handle_action(&Action::InsertLine, &mut buffer, &Mode::Normal);
 
         assert_eq!(cursor.col, 0);
         assert_eq!(cursor.absolute_position, 7);

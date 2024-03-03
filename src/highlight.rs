@@ -63,7 +63,7 @@ mod tests {
         let mut hl = Highlight::new(&theme);
 
         let buffer = "fn main() { println!(\"Hello, World!\"); }";
-        let colors = hl.colors(&buffer);
+        let colors = hl.colors(buffer);
 
         assert_eq!(colors.len(), 12);
     }

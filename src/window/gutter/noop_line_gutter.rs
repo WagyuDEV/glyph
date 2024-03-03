@@ -1,7 +1,7 @@
 use crate::config::Config;
-use crate::pane::Gutter;
-use crate::pane::Viewport;
 use crate::theme::Theme;
+use crate::window::Gutter;
+use crate::window::Viewport;
 
 #[derive(Debug)]
 pub struct NoopLineDrawer {

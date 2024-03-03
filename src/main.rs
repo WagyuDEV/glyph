@@ -5,10 +5,9 @@ mod editor;
 mod events;
 mod highlight;
 mod lsp;
-mod pane;
+mod tab;
 mod theme;
 mod tui;
-mod view;
 mod viewport;
 mod window;
 

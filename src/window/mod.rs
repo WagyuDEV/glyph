@@ -2,15 +2,15 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::buffer::Buffer;
-use crate::config::{Action, Config, KeyAction, LineNumbers};
+use crate::config::{Action, Config, LineNumbers};
 use crate::cursor::Cursor;
-use crate::editor::Mode;
+use crate::editor::{Mode, Size};
 use crate::highlight::Highlight;
 use crate::lsp::IncomingMessage;
-use crate::pane::gutter::Gutter;
 use crate::theme::Theme;
 use crate::tui::{HoverPopup, Scrollable, TuiView};
 use crate::viewport::{Cell, Viewport};
+use crate::window::gutter::Gutter;
 
 use self::gutter::absolute_line_gutter::AbsoluteLineGutter;
 use self::gutter::noop_line_gutter::NoopLineDrawer;
@@ -32,23 +32,23 @@ pub struct Rect {
     pub width: usize,
 }
 
-impl From<(u16, u16)> for Rect {
-    fn from((width, height): (u16, u16)) -> Self {
+impl From<Size> for Rect {
+    fn from(size: Size) -> Self {
         Self {
             col: 0,
             row: 0,
-            width: width as usize,
-            height: height as usize,
+            width: size.width,
+            height: size.height,
         }
     }
 }
 
-pub struct Pane<'a> {
+pub struct Window<'a> {
     pub id: usize,
     pub cursor: Cursor,
     highlight: Highlight<'a>,
     buffer_view: Box<dyn Scrollable + 'a>,
-    pub buffer: Rc<RefCell<Buffer>>,
+    pub buffer: Option<Rc<RefCell<Buffer>>>,
     /// Currently, `layers[0]` is the buffer layer and `layers[1]` is the popups layer
     layers: [Viewport; 2],
     popup: Option<HoverPopup<'a>>,
@@ -58,12 +58,13 @@ pub struct Pane<'a> {
     theme: &'a Theme,
 }
 
-impl<'a> Pane<'a> {
+impl<'a> Window<'a> {
     pub fn new(
         id: usize,
-        buffer: Rc<RefCell<Buffer>>,
+        buffer: Option<Rc<RefCell<Buffer>>>,
         theme: &'a Theme,
         config: &'a Config,
+        size: Rect,
     ) -> Self {
         let gutter: Box<dyn Gutter> = match config.line_numbers {
             LineNumbers::Absolute => {
@@ -77,8 +78,6 @@ impl<'a> Pane<'a> {
             }
             LineNumbers::None => Box::new(NoopLineDrawer::new(config.clone(), theme.clone())),
         };
-
-        let size: Rect = (1, 1).into();
 
         let layers = [
             Viewport::new(size.width, size.height),
@@ -101,8 +100,6 @@ impl<'a> Pane<'a> {
     }
 
     pub fn initialize(&mut self, mode: &Mode) -> anyhow::Result<()> {
-        self.layers[0] = Viewport::new(self.size.width, self.size.height);
-        self.layers[1] = Viewport::new(self.size.width, self.size.height);
         self.render(mode)?;
         Ok(())
     }
@@ -114,38 +111,27 @@ impl<'a> Pane<'a> {
         Ok(())
     }
 
-    pub fn handle_action(&mut self, action: &KeyAction, mode: &Mode) -> anyhow::Result<()> {
+    pub fn handle_action(&mut self, action: &Action, mode: &Mode) -> anyhow::Result<()> {
         self.popup = None;
-        self.layers[0] = Viewport::new(0, 0);
-        self.layers[1] = Viewport::new(0, 0);
-        match action {
-            KeyAction::Simple(Action::MoveToLineStart) => {
-                self.handle_cursor_action(action, mode)?
+        let col = self.cursor.col;
+        let row = self.cursor.row;
+        let mark = {
+            let buffer = self.buffer.as_mut().unwrap().borrow_mut();
+            let mark = buffer.marker.get_by_cursor(self.cursor.absolute_position);
+            mark.unwrap()
+        };
+
+        {
+            let mut buffer = self.buffer.as_mut().unwrap().borrow_mut();
+            buffer.handle_action(action, self.cursor.absolute_position)?;
+            self.cursor.handle_action(action, &mut buffer, mode);
+        }
+
+        if let Action::DeletePreviousChar = action {
+            if let (0, 1..) = (col, row) {
+                self.cursor.col = mark.size.saturating_sub(1);
+                self.cursor.absolute_position = mark.start + mark.size.saturating_sub(1);
             }
-            KeyAction::Simple(Action::MoveToLineEnd) => self.handle_cursor_action(action, mode)?,
-            KeyAction::Simple(Action::DeletePreviousChar) => {
-                self.handle_buffer_action(action, mode)?
-            }
-            KeyAction::Simple(Action::DeleteCurrentChar) => {
-                self.handle_buffer_action(action, mode)?
-            }
-            KeyAction::Simple(Action::NextWord) => self.handle_cursor_action(action, mode)?,
-            KeyAction::Simple(Action::MoveLeft) => self.handle_cursor_action(action, mode)?,
-            KeyAction::Simple(Action::MoveDown) => self.handle_cursor_action(action, mode)?,
-            KeyAction::Simple(Action::MoveUp) => self.handle_cursor_action(action, mode)?,
-            KeyAction::Simple(Action::MoveRight) => self.handle_cursor_action(action, mode)?,
-            KeyAction::Simple(Action::MoveToTop) => self.handle_cursor_action(action, mode)?,
-            KeyAction::Simple(Action::SaveBuffer) => self.handle_buffer_action(action, mode)?,
-            KeyAction::Simple(Action::MoveToBottom) => self.handle_cursor_action(action, mode)?,
-            KeyAction::Simple(Action::InsertLine) => self.handle_buffer_action(action, mode)?,
-            KeyAction::Simple(Action::InsertLineBelow) => {
-                self.handle_buffer_action(action, mode)?
-            }
-            KeyAction::Simple(Action::InsertLineAbove) => {
-                self.handle_buffer_action(action, mode)?
-            }
-            KeyAction::Simple(Action::InsertChar(_)) => self.handle_buffer_action(action, mode)?,
-            _ => (),
         };
 
         self.render(mode)?;
@@ -153,11 +139,13 @@ impl<'a> Pane<'a> {
     }
 
     fn render(&mut self, mode: &Mode) -> anyhow::Result<()> {
+        tracing::debug!("rendering again");
         self.buffer_view.hide_cursor()?;
         self.render_buffer()?;
         self.render_popup()?;
+        let buffer = self.buffer.as_mut().unwrap();
         self.buffer_view
-            .draw_cursor(mode, &self.buffer.borrow(), &self.cursor)?;
+            .draw_cursor(mode, buffer.clone(), &self.cursor)?;
         self.buffer_view.show_cursor()?;
         Ok(())
     }
@@ -193,6 +181,8 @@ impl<'a> Pane<'a> {
         let scroll = self.buffer_view.get_scroll();
         let buffer = self
             .buffer
+            .as_ref()
+            .unwrap()
             .borrow()
             .content_from(scroll.row, self.size.height);
         let colors = self.highlight.colors(&buffer);
@@ -220,49 +210,18 @@ impl<'a> Pane<'a> {
         self.cursor.get_readable_position()
     }
 
-    pub fn handle_cursor_action(&mut self, action: &KeyAction, mode: &Mode) -> anyhow::Result<()> {
-        self.cursor
-            .handle(action, &mut self.buffer.borrow_mut(), mode);
-        Ok(())
-    }
-
-    fn handle_buffer_action(&mut self, action: &KeyAction, mode: &Mode) -> anyhow::Result<()> {
-        let col = self.cursor.col;
-        let row = self.cursor.row;
-        let mark = {
-            let buffer = self.buffer.borrow_mut();
-            let mark = buffer.marker.get_by_cursor(self.cursor.absolute_position);
-            mark.unwrap()
-        };
-
-        self.buffer
-            .borrow_mut()
-            .handle_action(action, self.cursor.absolute_position)?;
-
-        self.handle_cursor_action(action, mode)?;
-
-        if let KeyAction::Simple(Action::DeletePreviousChar) = action {
-            if let (0, 1..) = (col, row) {
-                self.cursor.col = mark.size.saturating_sub(1);
-                self.cursor.absolute_position = mark.start + mark.size.saturating_sub(1);
-            }
-        };
-
-        Ok(())
-    }
-
     fn draw_sidebar(&mut self, viewport: &mut Viewport) {
         let scroll = self.buffer_view.get_scroll();
         self.gutter.draw(
             viewport,
-            self.buffer.borrow().marker.len(),
+            self.buffer.as_mut().unwrap().borrow_mut().marker.len(),
             self.cursor.row,
             scroll.row,
         );
     }
 
     pub fn get_buffer(&self) -> Rc<RefCell<Buffer>> {
-        self.buffer.clone()
+        self.buffer.as_ref().unwrap().clone()
     }
 
     pub fn handle_lsp_message(
@@ -299,7 +258,7 @@ impl<'a> Pane<'a> {
             self.cursor.col - scroll.col + offset,
             self.cursor.row - scroll.row,
             self.theme,
-            content.into(),
+            content,
         ));
         self.render(mode)?;
         Ok(())

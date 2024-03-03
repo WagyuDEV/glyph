@@ -1,11 +1,13 @@
+use std::cell::RefCell;
 use std::io::Stdout;
+use std::rc::Rc;
 
 use crate::buffer::Buffer;
 use crate::cursor::Cursor;
 use crate::editor::Mode;
-use crate::pane::{Position, Rect};
 use crate::theme::Style;
 use crate::viewport::{Cell, Viewport};
+use crate::window::{Position, Rect};
 
 mod hover_popup;
 mod tui_view;
@@ -26,7 +28,7 @@ pub trait Scrollable: Renderable {
             // Should scroll up
             (_, y) if (y + 1).saturating_sub(scroll.row) == 0 => {
                 tracing::error!("mths {} {}", (y + 1).saturating_sub(scroll.row), y);
-                scroll.row -= scroll.row - y;
+                scroll.row = scroll.row - (scroll.row - y);
             }
             // Should scroll right
             (x, _) if x.saturating_sub(scroll.col) >= *width => {
@@ -34,22 +36,26 @@ pub trait Scrollable: Renderable {
             }
             // Should scroll left
             (x, _) if (x + 1).saturating_sub(scroll.col) == 0 => {
-                scroll.col -= scroll.col - x;
+                scroll.col = scroll.col - (scroll.col - x);
             }
             _ => (),
         }
         self.set_scroll(scroll.clone());
     }
 
-    fn draw_cursor(&mut self, mode: &Mode, buffer: &Buffer, cursor: &Cursor) -> anyhow::Result<()> {
+    fn draw_cursor(
+        &mut self,
+        mode: &Mode,
+        buffer: Rc<RefCell<Buffer>>,
+        cursor: &Cursor,
+    ) -> anyhow::Result<()> {
         let offset = self.get_offset();
         let scroll = self.get_scroll().clone();
-
         let stdout = self.get_stdout();
 
         let col = {
             let mut col = 0;
-            if let Some(mark) = buffer.marker.get_by_line(cursor.row + 1) {
+            if let Some(mark) = buffer.borrow().marker.get_by_line(cursor.row + 1) {
                 col = match mode {
                     Mode::Normal => cursor.col.min(mark.size.saturating_sub(2)),
                     _ => cursor.col.min(mark.size.saturating_sub(1)),

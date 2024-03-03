@@ -1,20 +1,21 @@
 use std::cell::RefCell;
+use std::collections::HashMap;
+use std::io::{stdout, Stdout, Write};
 use std::rc::Rc;
-use std::sync::mpsc;
 use std::time::Duration;
 
 use crossterm::event::EventStream;
+use crossterm::{cursor, terminal, QueueableCommand};
 use futures::{future::FutureExt, StreamExt};
 use serde::{Deserialize, Serialize};
 
 use crate::buffer::Buffer;
-use crate::config::{Action, Config};
+use crate::config::{Action, Config, KeyAction};
 use crate::events::Events;
 use crate::lsp::{IncomingMessage, LspClient};
-use crate::pane::Pane;
+use crate::tab::Tab;
 use crate::theme::Theme;
-use crate::view::View;
-use crate::window::Window;
+use crate::window::{Rect, Window};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum Mode {
@@ -35,59 +36,114 @@ impl std::fmt::Display for Mode {
     }
 }
 
-pub struct Editor<'a> {
+#[derive(Default, Debug, Copy, Clone)]
+pub struct Size {
+    pub height: usize,
+    pub width: usize,
+}
+
+impl From<(u16, u16)> for Size {
+    fn from((width, height): (u16, u16)) -> Self {
+        Self {
+            width: width as usize,
+            height: height as usize,
+        }
+    }
+}
+
+pub trait Statusline {}
+pub trait Commandline {}
+
+pub struct Editor<'a /*S, C*/>
+//where
+//    S: Statusline,
+//    C: Commandline,
+{
     // TODO: in the future, we want to have a GUI for the editor. thus
     // the event pooling must maybe become a struct in order to allow
     // for both crossterm and whatever GUI lib we come to use
     events: Events<'a>,
-    view: View<'a>,
     lsp: LspClient,
+    stdout: Stdout,
+    size: Size,
+    //    statusline: S,
+    //    commandline: C,
     mode: Mode,
+    tabs: HashMap<usize, Tab>,
+    windows: HashMap<usize, Window<'a>>,
+    buffers: HashMap<usize, Rc<RefCell<Buffer>>>,
+    active_tab: usize,
+    active_window: usize,
+    active_buffer: usize,
 }
 
-impl<'a> Editor<'a> {
+impl<'a /*S, C*/> Editor<'a /*S, C*/>
+// where
+//     S: Statusline,
+//     C: Commandline,
+{
     pub async fn new(
         config: &'a Config,
         theme: &'a Theme,
         lsp: LspClient,
         file_name: Option<String>,
+        // statusline: S,
+        // commandline: C,
     ) -> anyhow::Result<Self> {
-        let buffer = Rc::new(RefCell::new(Buffer::new(1, file_name)?));
-        let pane = Pane::new(1, buffer.clone(), theme, config);
-        let window = Window::new(1, pane);
-        let (tx, rx) = mpsc::channel::<Action>();
-        let mode = Mode::Normal;
         let mut editor = Self {
             events: Events::new(config),
-            view: View::new(config, theme, window, tx, mode.clone())?,
             lsp,
-            mode,
+            mode: Mode::Normal,
+            stdout: stdout(),
+            size: terminal::size()?.into(),
+            // statusline,
+            // commandline,
+            tabs: HashMap::new(),
+            windows: HashMap::new(),
+            buffers: HashMap::new(),
+            active_tab: 1,
+            active_window: 1,
+            active_buffer: 1,
         };
 
-        editor.start(rx).await?;
+        let buffer_id = 1;
+        let buffer = Rc::new(RefCell::new(Buffer::new(buffer_id, file_name)?));
+        let mut window_size: Rect = editor.size.into();
+        window_size.height -= 2;
+        let window = Window::new(1, Some(buffer.clone()), theme, config, window_size);
+        let tab = Tab::new(1);
+        editor.tabs.insert(tab.id, tab);
+        editor.windows.insert(window.id, window);
+        editor.buffers.insert(buffer_id, buffer.clone());
+
+        editor.start().await?;
 
         Ok(editor)
     }
 
-    pub async fn start(&mut self, rx: mpsc::Receiver<Action>) -> anyhow::Result<()> {
-        self.view.initialize()?;
+    fn initialize(&mut self) -> anyhow::Result<()> {
+        terminal::enable_raw_mode()?;
+        self.stdout.queue(terminal::EnterAlternateScreen)?;
+        self.tabs
+            .get_mut(&self.active_tab)
+            .unwrap()
+            .initialize(&self.mode)?;
+        self.windows
+            .get_mut(&self.active_window)
+            .unwrap()
+            .initialize(&self.mode)?;
+        self.stdout.flush()?;
+        Ok(())
+    }
 
-        let mut stream = EventStream::new();
+    pub async fn start(&mut self) -> anyhow::Result<()> {
+        self.initialize()?;
         self.lsp.initialize().await?;
 
+        let mut stream = EventStream::new();
         loop {
             let delay = futures_timer::Delay::new(Duration::from_millis(30)).fuse();
             let event = stream.next().fuse();
-
-            if let Ok(action) = rx.try_recv() {
-                match action {
-                    Action::Quit => {
-                        self.view.shutdown()?;
-                        break;
-                    }
-                    _ => self.handle_action(action).await?,
-                }
-            }
 
             tokio::select! {
                 _ = delay => {
@@ -98,7 +154,12 @@ impl<'a> Editor<'a> {
                 maybe_event = event => {
                     if let Some(Ok(event)) = maybe_event {
                         if let Some(action) = self.events.handle(&event, &self.mode) {
-                            self.view.handle_action(&action)?;
+                            match action {
+                                KeyAction::Simple(Action::Quit) => {
+                                    break;
+                                }
+                                _ => self.handle_action(action).await?,
+                            }
                         }
                     };
                 }
@@ -108,29 +169,76 @@ impl<'a> Editor<'a> {
         Ok(())
     }
 
-    async fn handle_action(&mut self, action: Action) -> anyhow::Result<()> {
+    async fn handle_action(&mut self, action: KeyAction) -> anyhow::Result<()> {
+        let window = self.windows.get_mut(&self.active_window).unwrap();
+        let mut actions = Vec::new();
         match action {
-            Action::EnterMode(mode) => self.mode = mode,
-            Action::Hover => {
-                // TODO: find a better way to grab the file path and information. Maybe
-                // have the view give this data instead of querying like this.
-                let pane = self.view.get_active_window().get_active_pane();
-                let cursor = &pane.cursor;
-                let file_name = pane.buffer.borrow().file_name.clone();
-                let row = cursor.row;
-                let col = cursor.col;
-                self.lsp.request_hover(&file_name, row, col).await?;
-            }
+            KeyAction::Multiple(action) => actions.extend(action.into_iter()),
+            KeyAction::Simple(action) => actions.push(action),
             _ => (),
         };
+        for action in actions {
+            match action {
+                Action::MoveToLineStart => window.handle_action(&action, &self.mode)?,
+                Action::MoveToLineEnd => window.handle_action(&action, &self.mode)?,
+                Action::DeletePreviousChar => window.handle_action(&action, &self.mode)?,
+                Action::DeleteCurrentChar => window.handle_action(&action, &self.mode)?,
+                Action::NextWord => window.handle_action(&action, &self.mode)?,
+                Action::MoveLeft => window.handle_action(&action, &self.mode)?,
+                Action::MoveDown => window.handle_action(&action, &self.mode)?,
+                Action::MoveUp => window.handle_action(&action, &self.mode)?,
+                Action::MoveRight => window.handle_action(&action, &self.mode)?,
+                Action::MoveToTop => window.handle_action(&action, &self.mode)?,
+                Action::SaveBuffer => window.handle_action(&action, &self.mode)?,
+                Action::MoveToBottom => window.handle_action(&action, &self.mode)?,
+                Action::InsertLine => window.handle_action(&action, &self.mode)?,
+                Action::InsertLineBelow => window.handle_action(&action, &self.mode)?,
+                Action::InsertLineAbove => window.handle_action(&action, &self.mode)?,
+                Action::InsertChar(_) => window.handle_action(&action, &self.mode)?,
+                Action::EnterMode(Mode::Insert) => {
+                    self.mode = Mode::Insert;
+                    self.stdout.queue(cursor::SetCursorStyle::SteadyBar)?;
+                }
+                Action::EnterMode(Mode::Normal) => {
+                    self.mode = Mode::Normal;
+                    window.handle_action(&action, &self.mode)?;
+                    // self.maybe_leave_command_mode()?;
+                    self.stdout.queue(cursor::SetCursorStyle::SteadyBlock)?;
+                }
+                Action::EnterMode(Mode::Command) => {
+                    self.mode = Mode::Command;
+                    // self.enter_command_mode()?;
+                }
+                Action::Hover => {
+                    let buffer = self.buffers.get(&self.active_buffer).unwrap();
+                    let file_name = buffer.borrow().file_name.clone();
+                    let row = window.cursor.row;
+                    let col = window.cursor.col;
+                    self.lsp.request_hover(&file_name, row, col).await?;
+                }
+                Action::Resize(cols, rows) => {
+                    self.size = (cols, rows).into();
+                    window.resize(
+                        Rect {
+                            row: 0,
+                            col: 0,
+                            height: self.size.height - 2,
+                            width: self.size.width,
+                        },
+                        &self.mode,
+                    )?;
+                }
+                _ => (),
+            };
+        }
+        self.stdout.flush()?;
         Ok(())
     }
 
     fn handle_lsp_message(
         &mut self,
-        message: (IncomingMessage, Option<String>),
+        _message: (IncomingMessage, Option<String>),
     ) -> anyhow::Result<()> {
-        self.view.handle_lsp_message(message)?;
         Ok(())
     }
 }

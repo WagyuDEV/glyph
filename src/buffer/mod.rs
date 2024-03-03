@@ -6,12 +6,12 @@ use std::io;
 
 use crate::buffer::lines::Lines;
 use crate::buffer::marker::Marker;
-use crate::config::{Action, KeyAction};
+use crate::config::Action;
 use marker::Mark;
 
 #[derive(Debug)]
 pub struct Buffer {
-    pub id: u16,
+    pub id: usize,
     pub buffer: Vec<char>,
     pub marker: Box<dyn Marker>,
     pub file_name: String,
@@ -21,7 +21,7 @@ pub struct Buffer {
 }
 
 impl Buffer {
-    pub fn new(id: u16, file_name: Option<String>) -> io::Result<Self> {
+    pub fn new(id: usize, file_name: Option<String>) -> io::Result<Self> {
         let lines = match file_name {
             Some(ref name) => std::fs::read_to_string(name)?,
             None => String::new(),
@@ -32,7 +32,7 @@ impl Buffer {
         Ok(buffer)
     }
 
-    pub fn from_string(id: u16, content: &str, gap: usize) -> Self {
+    pub fn from_string(id: usize, content: &str, gap: usize) -> Self {
         let mut buffer = vec!['\0'; gap];
         buffer.extend(content.chars());
         let mut marker = <dyn Marker>::get_marker();
@@ -163,15 +163,15 @@ impl Buffer {
         Ok(())
     }
 
-    pub fn handle_action(&mut self, action: &KeyAction, cursor_pos: usize) -> anyhow::Result<()> {
+    pub fn handle_action(&mut self, action: &Action, cursor_pos: usize) -> anyhow::Result<()> {
         match action {
-            KeyAction::Simple(Action::InsertChar(c)) => self.insert_char(*c, cursor_pos),
-            KeyAction::Simple(Action::DeletePreviousChar) => self.delete_char(cursor_pos),
-            KeyAction::Simple(Action::DeleteCurrentChar) => self.delete_char(cursor_pos + 1),
-            KeyAction::Simple(Action::SaveBuffer) => self.try_save()?,
-            KeyAction::Simple(Action::InsertLine) => self.insert_char('\n', cursor_pos),
-            KeyAction::Simple(Action::InsertLineAbove) => self.insert_line_above(cursor_pos),
-            KeyAction::Simple(Action::InsertLineBelow) => self.insert_line_below(cursor_pos),
+            Action::InsertChar(c) => self.insert_char(*c, cursor_pos),
+            Action::DeletePreviousChar => self.delete_char(cursor_pos),
+            Action::DeleteCurrentChar => self.delete_char(cursor_pos + 1),
+            Action::SaveBuffer => self.try_save()?,
+            Action::InsertLine => self.insert_char('\n', cursor_pos),
+            Action::InsertLineAbove => self.insert_line_above(cursor_pos),
+            Action::InsertLineBelow => self.insert_line_below(cursor_pos),
             _ => (),
         };
         Ok(())
@@ -359,7 +359,7 @@ mod tests {
         let mut buffer = Buffer::from_string(1, "Hello, World!", 5);
         let first_needle = &"Hello!".chars().collect::<Vec<_>>();
 
-        _ = buffer.handle_action(&KeyAction::Simple(Action::InsertChar('!')), 5);
+        _ = buffer.handle_action(&Action::InsertChar('!'), 5);
 
         assert_eq!(buffer.gap_start, 6);
         assert!(buffer.buffer[0..buffer.gap_start].starts_with(first_needle));
@@ -389,7 +389,7 @@ mod tests {
         let mut buffer = Buffer::from_string(1, "Hello, World!", 5);
         let first_needle = &"Hell".chars().collect::<Vec<_>>();
 
-        let _ = buffer.handle_action(&KeyAction::Simple(Action::DeletePreviousChar), 5);
+        let _ = buffer.handle_action(&Action::DeletePreviousChar, 5);
 
         assert_eq!(buffer.gap_start, 4);
         assert!(buffer.buffer[0..buffer.gap_start].starts_with(first_needle));
@@ -402,7 +402,7 @@ mod tests {
         let first_needle = &"Hello".chars().collect::<Vec<_>>();
         let second_needle = &", World!".chars().collect::<Vec<_>>();
 
-        let _ = buffer.handle_action(&KeyAction::Simple(Action::InsertLine), 5);
+        let _ = buffer.handle_action(&Action::InsertLine, 5);
 
         assert_eq!(buffer.gap_start, 6);
         assert!(buffer.buffer[0..buffer.gap_start].starts_with(first_needle));

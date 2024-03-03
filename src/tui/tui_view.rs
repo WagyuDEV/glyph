@@ -2,10 +2,10 @@ use std::io::{stdout, Stdout};
 
 use crossterm::{cursor, style, QueueableCommand};
 
-use crate::pane::{Position, Rect};
 use crate::theme::Style;
 use crate::tui::{Renderable, Scrollable};
 use crate::viewport::{Cell, Viewport};
+use crate::window::{Position, Rect};
 
 pub struct TuiView {
     stdout: Stdout,

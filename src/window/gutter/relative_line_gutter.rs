@@ -1,7 +1,7 @@
 use crate::config::{Config, LineNumbers};
-use crate::pane::gutter::Gutter;
-use crate::pane::Viewport;
 use crate::theme::Theme;
+use crate::window::gutter::Gutter;
+use crate::window::Viewport;
 
 #[derive(Debug)]
 pub struct RelativeLineDrawer {

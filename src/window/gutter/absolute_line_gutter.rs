@@ -1,8 +1,8 @@
 use crate::config::Config;
-use crate::pane::Viewport;
 use crate::theme::Theme;
+use crate::window::Viewport;
 
-use crate::pane::gutter::Gutter;
+use crate::window::gutter::Gutter;
 
 #[derive(Debug, Clone)]
 pub struct AbsoluteLineGutter {

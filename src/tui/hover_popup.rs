@@ -4,10 +4,10 @@ use crossterm::style;
 use crossterm::{cursor, QueueableCommand};
 
 use crate::buffer::Buffer;
-use crate::pane::Position;
 use crate::theme::Theme;
 use crate::viewport::Viewport;
-use crate::{pane::Rect, viewport::Cell};
+use crate::window::Position;
+use crate::{viewport::Cell, window::Rect};
 
 use super::Renderable;
 
@@ -78,7 +78,7 @@ impl Renderable for HoverPopup<'_> {
         for r in 0..self.area.height + 1 {
             self.stdout
                 .queue(cursor::MoveTo(
-                    0 + self.area.col as u16,
+                    self.area.col as u16,
                     r as u16 + self.area.row as u16,
                 ))?
                 .queue(style::SetBackgroundColor(default_style.bg.unwrap()))?
