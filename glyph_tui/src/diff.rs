@@ -1,19 +1,5 @@
-use crate::theme::Style;
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Cell {
-    pub c: char,
-    pub style: Style,
-}
-
-impl Default for Cell {
-    fn default() -> Self {
-        Self {
-            c: ' ',
-            style: Default::default(),
-        }
-    }
-}
+use glyph_core::editor::Cell;
+use glyph_core::theme::Style;
 
 #[derive(Debug, Clone, Default)]
 pub struct Viewport {
@@ -76,7 +62,7 @@ impl Viewport {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::theme::Style;
+    use glyph_core::theme::Style;
 
     #[test]
     fn test_initialize_correctly() {

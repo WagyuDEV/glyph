@@ -1,17 +1,21 @@
 mod commandline;
+mod diff;
 mod editor;
 mod event_handler;
 mod statusline;
+mod view;
 
 use commandline::TuiCommandline;
+use glyph_core::commandline::Commandline;
 use glyph_core::config::Config;
-use glyph_core::editor::{Commandline, Size, Statusline};
+use glyph_core::editor::Size;
 use glyph_core::lsp::LspClient;
+use glyph_core::statusline::Statusline;
 
 use editor::{EditorSetup, TuiEditor};
 use event_handler::TuiEventHandler;
 
-use glyph_core::window::Rect;
+use glyph_core::editor::Rect;
 use statusline::TuiStatusline;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;

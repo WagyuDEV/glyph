@@ -1,14 +1,16 @@
 pub mod buffer;
+pub mod commandline;
 pub mod config;
 pub mod cursor;
 pub mod editor;
 pub mod event_handler;
+pub mod gutter;
 pub mod highlight;
 pub mod lsp;
+pub mod statusline;
 pub mod tab;
 pub mod theme;
-pub mod tui;
-pub mod viewport;
+pub mod ui;
 pub mod window;
 
 use std::{

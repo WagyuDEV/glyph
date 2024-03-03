@@ -1,8 +1,7 @@
+use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::PathBuf};
 
-use serde::{Deserialize, Serialize};
-
-use crate::editor::Mode;
+use crate::editor::KeyAction;
 
 const fn default_true() -> bool {
     true
@@ -37,49 +36,6 @@ pub struct Config {
     pub show_diagnostics: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub enum Action {
-    EnterMode(Mode),
-    Quit,
-    Undo,
-    InsertLine,
-    InsertLineBelow,
-    InsertLineAbove,
-    PasteBelow,
-    FindNext,
-    FindPrevious,
-    CenterLine,
-    InsertTab,
-    InsertChar(char),
-    InsertCommand(char),
-    ExecuteCommand,
-    SaveBuffer,
-    DeleteUntilEOL,
-    Resize(u16, u16),
-
-    NextWord,
-    PreviousWord,
-    MoveLeft,
-    MoveDown,
-    MoveUp,
-    MoveRight,
-    MoveToBottom,
-    MoveToTop,
-    MoveToLineEnd,
-    MoveToLineStart,
-    PageDown,
-    PageUp,
-
-    DeleteCurrentChar,
-    DeleteBack,
-    DeleteWord,
-    DeleteLine,
-    DeletePreviousChar,
-
-    GoToDefinition,
-    Hover,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Keys {
     #[serde(default)]
@@ -88,14 +44,6 @@ pub struct Keys {
     pub insert: HashMap<String, KeyAction>,
     #[serde(default)]
     pub command: HashMap<String, KeyAction>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(untagged)]
-pub enum KeyAction {
-    Simple(Action),
-    Multiple(Vec<Action>),
-    Complex(HashMap<String, KeyAction>),
 }
 
 impl Config {

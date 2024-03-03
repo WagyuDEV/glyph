@@ -6,11 +6,12 @@ use crossterm::{
     QueueableCommand,
 };
 use glyph_core::{
-    editor::{Statusline, StatuslineUpdate},
+    editor::{Position, Rect},
+    statusline::{Statusline, StatuslineUpdate},
     theme::Theme,
-    viewport::Viewport,
-    window::{Position, Rect},
 };
+
+use crate::diff::Viewport;
 
 #[derive(Debug)]
 pub struct TuiStatusline<'a> {
@@ -30,7 +31,7 @@ impl<'a> Statusline<'a> for TuiStatusline<'a> {
         }
     }
 
-    fn resize(area: glyph_core::window::Rect) {}
+    fn resize(area: Rect) {}
 
     fn render(&mut self, update: StatuslineUpdate) -> anyhow::Result<()> {
         self.draw(&update);

@@ -6,7 +6,7 @@ use std::io;
 
 use crate::buffer::lines::Lines;
 use crate::buffer::marker::Marker;
-use crate::config::Action;
+use crate::editor::Action;
 use marker::Mark;
 
 #[derive(Debug)]

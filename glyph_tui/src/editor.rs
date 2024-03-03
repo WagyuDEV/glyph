@@ -5,18 +5,22 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use glyph_core::buffer::Buffer;
-use glyph_core::config::{Action, Config, KeyAction};
-use glyph_core::editor::{Commandline, Mode, Size, Statusline, StatuslineUpdate};
+use glyph_core::commandline::Commandline;
+use glyph_core::config::Config;
+use glyph_core::editor::{Action, KeyAction, Mode, Rect, Size};
 use glyph_core::event_handler::EventHandler;
 use glyph_core::lsp::{IncomingMessage, LspClient};
+use glyph_core::statusline::{Statusline, StatuslineUpdate};
 use glyph_core::tab::Tab;
 use glyph_core::theme::Theme;
-use glyph_core::window::{Rect, Window};
+use glyph_core::window::Window;
 
 use crossterm::cursor;
 use crossterm::event::EventStream;
 use crossterm::{terminal, QueueableCommand};
 use futures::{future::FutureExt, StreamExt};
+
+use crate::view::TuiView;
 
 pub struct TuiEditor<'a, S, C, E>
 where
@@ -83,8 +87,8 @@ where
             1,
             Some(buffer.clone()),
             setup.theme,
-            setup.config,
-            window_size,
+            window_size.clone(),
+            Box::new(TuiView::new(window_size, setup.config, setup.theme)),
         );
         let tab = Tab::new(1);
         editor.tabs.insert(tab.id, tab);

@@ -1,8 +1,8 @@
 use crate::buffer::Buffer;
-use crate::config::Action;
+use crate::editor::Action;
 use crate::editor::Mode;
 
-use crate::window::Position;
+use crate::editor::Position;
 
 #[derive(Debug, Default)]
 pub struct Cursor {

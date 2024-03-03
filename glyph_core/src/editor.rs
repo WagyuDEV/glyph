@@ -1,10 +1,7 @@
-use std::{cell::RefCell, rc::Rc};
-
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
-use crate::buffer::Buffer;
-use crate::theme::Theme;
-use crate::window::{Position, Rect};
+use crate::theme::Style;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum Mode {
@@ -25,6 +22,57 @@ impl std::fmt::Display for Mode {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum KeyAction {
+    Simple(Action),
+    Multiple(Vec<Action>),
+    Complex(HashMap<String, KeyAction>),
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum Action {
+    EnterMode(Mode),
+    Quit,
+    Undo,
+    InsertLine,
+    InsertLineBelow,
+    InsertLineAbove,
+    PasteBelow,
+    FindNext,
+    FindPrevious,
+    CenterLine,
+    InsertTab,
+    InsertChar(char),
+    InsertCommand(char),
+    ExecuteCommand,
+    SaveBuffer,
+    DeleteUntilEOL,
+    Resize(u16, u16),
+
+    NextWord,
+    PreviousWord,
+    MoveLeft,
+    MoveDown,
+    MoveUp,
+    MoveRight,
+    MoveToBottom,
+    MoveToTop,
+    MoveToLineEnd,
+    MoveToLineStart,
+    PageDown,
+    PageUp,
+
+    DeleteCurrentChar,
+    DeleteBack,
+    DeleteWord,
+    DeleteLine,
+    DeletePreviousChar,
+
+    GoToDefinition,
+    Hover,
+}
+
 #[derive(Default, Debug, Copy, Clone)]
 pub struct Size {
     pub height: usize,
@@ -40,30 +88,53 @@ impl From<(u16, u16)> for Size {
     }
 }
 
-#[derive(Debug)]
-pub struct StatuslineUpdate {
-    pub mode: Mode,
-    pub cursor_pos: Position,
-    pub buffer: Rc<RefCell<Buffer>>,
+#[derive(Debug, Default, Clone)]
+pub struct Position {
+    pub row: usize,
+    pub col: usize,
 }
 
-impl StatuslineUpdate {
-    pub fn new(mode: Mode, cursor_pos: Position, buffer: Rc<RefCell<Buffer>>) -> Self {
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Rect {
+    pub row: usize,
+    pub col: usize,
+    pub height: usize,
+    pub width: usize,
+}
+
+impl Rect {
+    pub fn new(col: usize, row: usize, width: usize, height: usize) -> Self {
         Self {
-            mode,
-            cursor_pos,
-            buffer,
+            col,
+            row,
+            width,
+            height,
         }
     }
 }
 
-pub trait Statusline<'a> {
-    fn new(area: Rect, theme: &'a Theme) -> Self;
-    fn resize(area: Rect);
-    fn render(&mut self, update: StatuslineUpdate) -> anyhow::Result<()>;
+impl From<Size> for Rect {
+    fn from(size: Size) -> Self {
+        Self {
+            col: 0,
+            row: 0,
+            width: size.width,
+            height: size.height,
+        }
+    }
 }
 
-pub trait Commandline {
-    fn new(area: Rect) -> Self;
-    fn render(&mut self) -> anyhow::Result<()>;
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Cell {
+    pub c: char,
+    pub style: Style,
+}
+
+impl Default for Cell {
+    fn default() -> Self {
+        Self {
+            c: ' ',
+            style: Default::default(),
+        }
+    }
 }

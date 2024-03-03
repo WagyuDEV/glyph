@@ -1,4 +1,4 @@
-use crate::config::KeyAction;
+use crate::editor::KeyAction;
 use crate::editor::Mode;
 
 use crossterm::event::Event;

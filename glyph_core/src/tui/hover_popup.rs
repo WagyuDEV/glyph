@@ -4,10 +4,9 @@ use crossterm::style;
 use crossterm::{cursor, QueueableCommand};
 
 use crate::buffer::Buffer;
+use crate::editor::{Position, Rect};
 use crate::theme::Theme;
-use crate::viewport::Viewport;
-use crate::window::Position;
-use crate::{viewport::Cell, window::Rect};
+use crate::viewport::{Cell, Viewport};
 
 use super::Renderable;
 
