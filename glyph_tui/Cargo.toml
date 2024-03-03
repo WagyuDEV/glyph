@@ -11,4 +11,6 @@ tracing-appender.workspace = true
 tokio.workspace = true
 glyph_core.workspace = true
 crossterm.workspace = true
-
+futures-timer.workspace = true
+futures.workspace = true
+futures-util.workspace = true

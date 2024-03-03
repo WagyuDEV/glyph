@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
+use glyph_core::config::{Action, Config, KeyAction};
+use glyph_core::editor::Mode;
 use glyph_core::event_handler::EventHandler;
-use glyph_core::Mode;
-use glyph_core::{Action, Config, KeyAction};
 
 use crossterm::event::Event;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};

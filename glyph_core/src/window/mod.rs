@@ -83,7 +83,7 @@ impl<'a> Window<'a> {
             id,
             buffer,
             highlight: Highlight::new(theme),
-            cursor: Cursor::new(),
+            cursor: Cursor::default(),
             buffer_view: Box::new(TuiView::new(size.clone(), config.gutter_width)),
             // the layers are initialized empty so we render everything on the first render
             layers: [Viewport::new(0, 0), Viewport::new(0, 0)],

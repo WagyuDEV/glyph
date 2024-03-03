@@ -1,27 +1,22 @@
-mod buffer;
-mod config;
-mod cursor;
-mod editor;
+pub mod buffer;
+pub mod config;
+pub mod cursor;
+pub mod editor;
 pub mod event_handler;
-mod highlight;
-mod lsp;
-mod tab;
-mod theme;
-mod tui;
-mod viewport;
-mod window;
-
-pub use config::{Action, Config, KeyAction};
-pub use editor::Editor;
-pub use editor::Mode;
-pub use lsp::LspClient;
+pub mod highlight;
+pub mod lsp;
+pub mod tab;
+pub mod theme;
+pub mod tui;
+pub mod viewport;
+pub mod window;
 
 use std::{
     io::{Error, ErrorKind},
     path::{Path, PathBuf},
 };
 
-use config::EditorBackground;
+use config::{Config, EditorBackground};
 use theme::{loader::ThemeLoader, Theme};
 
 pub fn load_config() -> anyhow::Result<Config> {

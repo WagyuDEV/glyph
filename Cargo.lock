@@ -299,6 +299,9 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "crossterm",
+ "futures",
+ "futures-timer",
+ "futures-util",
  "glyph_core",
  "tokio",
  "tracing",
