@@ -1,10 +1,15 @@
 use std::collections::HashMap;
 
 use crossterm::event::Event;
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent};
 
 use crate::config::{Action, Config, KeyAction};
 use crate::editor::Mode;
+
+pub trait EventHandler {
+    // TODO: once we start looking into GUI, this would have to be our own event
+    fn poll(&mut self, event: &Event, mode: &Mode) -> Option<KeyAction>;
+}
 
 #[derive(Debug)]
 pub struct Events<'a> {
@@ -12,15 +17,8 @@ pub struct Events<'a> {
     config: &'a Config,
 }
 
-impl<'a> Events<'a> {
-    pub fn new(config: &'a Config) -> Self {
-        Events {
-            action_being_composed: None,
-            config,
-        }
-    }
-
-    pub fn handle(&mut self, event: &Event, mode: &Mode) -> Option<KeyAction> {
+impl EventHandler for Events<'_> {
+    fn poll(&mut self, event: &Event, mode: &Mode) -> Option<KeyAction> {
         if let Some(action) = self.action_being_composed.take() {
             self.action_being_composed = Some(action);
             match event {
@@ -63,6 +61,15 @@ impl<'a> Events<'a> {
             Mode::Search => self.handle_search_event(event),
         }
     }
+}
+
+impl<'a> Events<'a> {
+    pub fn new(config: &'a Config) -> Self {
+        Events {
+            action_being_composed: None,
+            config,
+        }
+    }
 
     pub fn handle_normal_event(&mut self, event: &Event) -> Option<KeyAction> {
         let (key, action) = self.map_event_to_key_action(&self.config.keys.normal, event);
@@ -96,6 +103,7 @@ impl<'a> Events<'a> {
             _ => None,
         }
     }
+
     pub fn handle_command_event(&self, event: &Event) -> Option<KeyAction> {
         let (_, action) = self.map_event_to_key_action(&self.config.keys.command, event);
         if let Some(action) = action {
@@ -113,6 +121,7 @@ impl<'a> Events<'a> {
             _ => None,
         }
     }
+
     pub fn handle_search_event(&self, _event: &Event) -> Option<KeyAction> {
         None
     }

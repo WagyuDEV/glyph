@@ -17,6 +17,7 @@ use std::{
 };
 
 use config::{Config, EditorBackground};
+use events::Events;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
@@ -84,6 +85,7 @@ async fn main() -> anyhow::Result<()> {
     let lsp = LspClient::start().await?;
     let config = load_config()?;
     let theme = load_theme(&config.background, &config.theme, Config::themes_path())?;
-    Editor::new(&config, &theme, lsp, file_name).await?;
+    let event_handler = Events::new(&config);
+    Editor::new(&config, &theme, lsp, file_name, event_handler).await?;
     Ok(())
 }

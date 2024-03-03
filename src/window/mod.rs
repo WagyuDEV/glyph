@@ -49,7 +49,7 @@ pub struct Window<'a> {
     highlight: Highlight<'a>,
     buffer_view: Box<dyn Scrollable + 'a>,
     pub buffer: Option<Rc<RefCell<Buffer>>>,
-    /// Currently, `layers[0]` is the buffer layer and `layers[1]` is the popups layer
+    // Currently, `layers[0]` is the buffer layer and `layers[1]` is the popups layer
     layers: [Viewport; 2],
     popup: Option<HoverPopup<'a>>,
     config: &'a Config,
@@ -79,18 +79,14 @@ impl<'a> Window<'a> {
             LineNumbers::None => Box::new(NoopLineDrawer::new(config.clone(), theme.clone())),
         };
 
-        let layers = [
-            Viewport::new(size.width, size.height),
-            Viewport::new(size.width, size.height),
-        ];
-
         Self {
             id,
             buffer,
             highlight: Highlight::new(theme),
             cursor: Cursor::new(),
             buffer_view: Box::new(TuiView::new(size.clone(), config.gutter_width)),
-            layers,
+            // the layers are initialized empty so we render everything on the first render
+            layers: [Viewport::new(0, 0), Viewport::new(0, 0)],
             size,
             gutter,
             config,

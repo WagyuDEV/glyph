@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::buffer::Buffer;
 use crate::config::{Action, Config, KeyAction};
-use crate::events::Events;
+use crate::events::EventHandler;
 use crate::lsp::{IncomingMessage, LspClient};
 use crate::tab::Tab;
 use crate::theme::Theme;
@@ -54,15 +54,13 @@ impl From<(u16, u16)> for Size {
 pub trait Statusline {}
 pub trait Commandline {}
 
-pub struct Editor<'a /*S, C*/>
-//where
-//    S: Statusline,
-//    C: Commandline,
+pub struct Editor<'a /*S, C*/, E>
+where
+    // S: Statusline,
+    // C: Commandline,
+    E: EventHandler,
 {
-    // TODO: in the future, we want to have a GUI for the editor. thus
-    // the event pooling must maybe become a struct in order to allow
-    // for both crossterm and whatever GUI lib we come to use
-    events: Events<'a>,
+    event_handler: E,
     lsp: LspClient,
     stdout: Stdout,
     size: Size,
@@ -77,10 +75,11 @@ pub struct Editor<'a /*S, C*/>
     active_buffer: usize,
 }
 
-impl<'a /*S, C*/> Editor<'a /*S, C*/>
-// where
-//     S: Statusline,
-//     C: Commandline,
+impl<'a /*S, C*/, E> Editor<'a /*S, C*/, E>
+where
+    // S: Statusline,
+    // C: Commandline,
+    E: EventHandler,
 {
     pub async fn new(
         config: &'a Config,
@@ -89,9 +88,10 @@ impl<'a /*S, C*/> Editor<'a /*S, C*/>
         file_name: Option<String>,
         // statusline: S,
         // commandline: C,
+        event_handler: E,
     ) -> anyhow::Result<Self> {
         let mut editor = Self {
-            events: Events::new(config),
+            event_handler,
             lsp,
             mode: Mode::Normal,
             stdout: stdout(),
@@ -153,7 +153,7 @@ impl<'a /*S, C*/> Editor<'a /*S, C*/>
                 }
                 maybe_event = event => {
                     if let Some(Ok(event)) = maybe_event {
-                        if let Some(action) = self.events.handle(&event, &self.mode) {
+                        if let Some(action) = self.event_handler.poll(&event, &self.mode) {
                             match action {
                                 KeyAction::Simple(Action::Quit) => {
                                     break;
@@ -170,13 +170,10 @@ impl<'a /*S, C*/> Editor<'a /*S, C*/>
     }
 
     async fn handle_action(&mut self, action: KeyAction) -> anyhow::Result<()> {
-        let window = self.windows.get_mut(&self.active_window).unwrap();
         let mut actions = Vec::new();
-        match action {
-            KeyAction::Multiple(action) => actions.extend(action.into_iter()),
-            KeyAction::Simple(action) => actions.push(action),
-            _ => (),
-        };
+        flatten_actions(&mut actions, action);
+
+        let window = self.windows.get_mut(&self.active_window).unwrap();
         for action in actions {
             match action {
                 Action::MoveToLineStart => window.handle_action(&action, &self.mode)?,
@@ -201,13 +198,13 @@ impl<'a /*S, C*/> Editor<'a /*S, C*/>
                 }
                 Action::EnterMode(Mode::Normal) => {
                     self.mode = Mode::Normal;
-                    window.handle_action(&action, &self.mode)?;
                     // self.maybe_leave_command_mode()?;
                     self.stdout.queue(cursor::SetCursorStyle::SteadyBlock)?;
                 }
                 Action::EnterMode(Mode::Command) => {
                     self.mode = Mode::Command;
                     // self.enter_command_mode()?;
+                    self.stdout.queue(cursor::SetCursorStyle::SteadyBar)?;
                 }
                 Action::Hover => {
                     let buffer = self.buffers.get(&self.active_buffer).unwrap();
@@ -241,4 +238,15 @@ impl<'a /*S, C*/> Editor<'a /*S, C*/>
     ) -> anyhow::Result<()> {
         Ok(())
     }
+}
+
+fn flatten_actions(actions: &mut Vec<Action>, action: KeyAction) {
+    match action {
+        KeyAction::Multiple(a) => actions.extend(a),
+        KeyAction::Simple(a) => actions.push(a),
+        KeyAction::Complex(map) => {
+            map.values()
+                .for_each(|a| flatten_actions(actions, a.clone()));
+        }
+    };
 }
